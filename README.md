@@ -48,3 +48,4 @@ curl -X POST -H "Content-Type: application/json" -d '{
 1) Обработка потенциальных ошибок
 2) Тесты
 3) Контейнеризация (Docker)
+4) Многопоточность
