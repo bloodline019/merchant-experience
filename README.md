@@ -1,4 +1,6 @@
 # merchant-experience
+![Go](https://img.shields.io/badge/go-%2300ADD8.svg?style=for-the-badge&logo=go&logoColor=white)
+![Postgres](https://img.shields.io/badge/postgres-%23316192.svg?style=for-the-badge&logo=postgresql&logoColor=white)  
 Тестовое задание:
 Задача разработать сервис, через который продавцы смогут передавать нам свои товары пачками в формате excel (xlsx).
 UI делать не нужно, достаточно только API.
