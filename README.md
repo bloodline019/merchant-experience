@@ -18,3 +18,27 @@ UI делать не нужно, достаточно только API.
 - price цена в рублях
 - quantity количество товара на складе продавца
 - available true/false, в случае false продавец хочет удалить товар из нашей базы
+
+# Использование
+
+API реализует следующие методы:
+1. POST /upload - загрузка Excel файла на сервер и его последующая обработка
+2. POST /getGoods - получение списка товаров из базы согласно передаваемым параметрам
+
+Для загрузки Excel файла на сервер и получения краткой статистики работы необходимо передать POST запрос по методу /upload на сервер c данными в формате JSON (Url, seller_id).  
+Формат запроса:
+```
+curl -X POST -H "Content-Type: application/json" -d '{
+  "Url": "https://cdn.discordapp.com/attachments/1061032871785136158/1061033596057567394/goods_initial.xlsx",
+  "seller_id": "1"
+}' http://localhost:8080/upload
+```
+Для получения списка товаров из базы необходимо передать POST запрос по методу /getGoods на сервер c данными в формате JSON (поддерживается любая комбинация параметров).  
+Формат запроса:
+```
+curl -X POST -H "Content-Type: application/json" -d '{
+  "offer_id": "",
+  "seller_id": "",
+  "goodSubstring": "Pro"
+}' http://localhost:8080/getGoods
+```
