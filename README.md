@@ -44,7 +44,7 @@ curl -X POST -H "Content-Type: application/json" -d '{
   "goodSubstring": "Pro"
 }' http://localhost:8080/getGoods
 ```
-TODO:  
+# TODO:  
 1) Обработка потенциальных ошибок
 2) Тесты
 3) Контейнеризация (Docker)
