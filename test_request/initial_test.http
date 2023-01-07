@@ -1,0 +1,10 @@
+POST http://localhost:8080/upload
+Content-Type: application/json
+
+{
+  "Url": "https://cdn.discordapp.com/attachments/1061032871785136158/1061033596057567394/goods_initial.xlsx",
+  "seller_id": "1"
+}
+
+###
+

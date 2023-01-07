@@ -1,0 +1,11 @@
+POST http://localhost:8080/getGoods
+Content-Type: application/json
+
+{
+  "offer_id": "",
+  "seller_id": "",
+  "goodSubstring": "Pro"
+}
+
+###
+
