@@ -1,14 +1,18 @@
 package goods
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"github.com/thedatashed/xlsxreader"
+	"github.com/volatiletech/sqlboiler/v4/boil"
+	. "github.com/volatiletech/sqlboiler/v4/queries/qm"
 	"merchant-experience/database"
+	"merchant-experience/models"
 	"strconv"
 )
 
-// Определение статистики для возврата клиенту
+// Stats Определение статистики для возврата клиенту
 type Stats struct {
 	Created int `json:"created"`
 	Updated int `json:"updated"`
@@ -16,7 +20,7 @@ type Stats struct {
 	Errors  int `json:"errors"`
 }
 
-// Определение структуры товара
+// Goods Определение структуры товара
 type Goods struct {
 	OfferID   int
 	Name      string
@@ -26,10 +30,9 @@ type Goods struct {
 	SellerID  int
 }
 
-// Парсинг XLSX файла по заданной структуре Goods
+// ParseXlsx Парсинг XLSX файла по заданной структуре Goods
 func ParseXlsx(file []byte, sellerID string) ([]Goods, error) {
 	xl, err := xlsxreader.NewReader(file)
-
 	if err != nil {
 		return nil, err
 	}
@@ -39,8 +42,8 @@ func ParseXlsx(file []byte, sellerID string) ([]Goods, error) {
 		id, err1 := strconv.ParseFloat(row.Cells[0].Value, 64)
 		price, err2 := strconv.ParseFloat(row.Cells[2].Value, 64)
 		quantity, err3 := strconv.ParseFloat(row.Cells[3].Value, 64)
-		avaliable, err4 := strconv.ParseBool(row.Cells[4].Value)
-		seller_id, err5 := strconv.Atoi(sellerID)
+		available, err4 := strconv.ParseBool(row.Cells[4].Value)
+		sellerId, err5 := strconv.Atoi(sellerID)
 		//Пропустим товары с некорректными данными
 		if err1 != nil {
 			fmt.Printf("Error with convertation id to int: %v", err1)
@@ -57,7 +60,7 @@ func ParseXlsx(file []byte, sellerID string) ([]Goods, error) {
 			continue
 		}
 		if err4 != nil {
-			fmt.Printf("Error with convertation avaliable to bool: %v", err4)
+			fmt.Printf("Error with convertation available to bool: %v", err4)
 			continue
 		}
 		if err5 != nil {
@@ -70,8 +73,8 @@ func ParseXlsx(file []byte, sellerID string) ([]Goods, error) {
 			Name:      row.Cells[1].Value,
 			Price:     price,
 			Quantity:  int(quantity),
-			Available: avaliable,
-			SellerID:  seller_id,
+			Available: available,
+			SellerID:  sellerId,
 		}
 		goods = append(goods, g)
 	}
@@ -81,95 +84,100 @@ func ParseXlsx(file []byte, sellerID string) ([]Goods, error) {
 func SaveGoods(goods []Goods) (Stats, error) {
 	// Connect to the database
 	db, err := database.ConnectToDB()
-	defer db.Close()
+	defer func(db *sql.DB) {
+		err := db.Close()
+		if err != nil {
+
+		}
+	}(db)
 	if err != nil {
 		return Stats{}, err
 	}
 
 	// Save or update the goods in the database
 	stats := Stats{}
-	entryCheckQuery := "SELECT * FROM products WHERE seller_id = $1 AND offer_id = $2"
-	insertQuery := "INSERT INTO products (offer_id, name, price, quantity, available, seller_id) VALUES ($1, $2, $3, $4, $5, $6)"
-	updateQuery := "UPDATE products SET name = $1, price = $2, quantity = $3, available = $4 WHERE seller_id = $5 AND offer_id = $6"
-	deleteQuery := "DELETE FROM products WHERE seller_id = $1 AND offer_id = $2"
 	for _, good := range goods {
-		rows, _ := db.Query(entryCheckQuery, good.SellerID, good.OfferID)
-		// If the entry not exists, insert it
-		if rows.Next() == false {
-			_, err := db.Exec(insertQuery, good.OfferID, good.Name, good.Price, good.Quantity, good.Available, good.SellerID)
+		match, _ := models.Products(Where("seller_id = ? AND offer_id = ?", good.SellerID, good.OfferID)).Exists(context.Background(), db)
+		product := models.Product{
+			OfferID:   good.OfferID,
+			Name:      good.Name,
+			Price:     good.Price,
+			Quantity:  good.Quantity,
+			Available: good.Available,
+			SellerID:  good.SellerID,
+		}
+
+		if !match && good.Available {
+			err := product.Insert(context.Background(), db, boil.Infer())
 			if err != nil {
 				stats.Errors++
 				continue
 			}
 			stats.Created++
-		} else {
-			if good.Available == false {
-				_, err := db.Exec(deleteQuery, good.SellerID, good.OfferID)
-				if err != nil {
-					stats.Errors++
-					continue
-				}
-				stats.Deleted++
-			} else {
-				_, err := db.Exec(updateQuery, good.Name, good.Price, good.Quantity, good.Available, good.SellerID, good.OfferID)
-				if err != nil {
-					stats.Errors++
-					continue
-				}
-				stats.Updated++
+		} else if good.Available == false && match {
+			product := models.Product{
+				OfferID:  good.OfferID,
+				SellerID: good.SellerID}
+			_, err := product.Delete(context.Background(), db)
+			if err != nil {
+				stats.Errors++
+				continue
 			}
+			stats.Deleted++
+		} else if match && good.Available {
+			_, err := product.Update(context.Background(), db, boil.Infer())
+			if err != nil {
+				stats.Errors++
+				continue
+			}
+			stats.Updated++
+		} else {
+			continue
 		}
-
 	}
 	return stats, nil
 }
 
-func GetGoods(offer_id int, seller_id int, substring string) []Goods {
-	rows := doQuery(offer_id, seller_id, substring)
-	defer rows.Close()
+func GetGoods(offerId int, sellerId int, substring string) []Goods {
+	rows := doQuery(offerId, sellerId, substring)
 	var goods []Goods
-	for rows.Next() {
-		var good Goods
-		err := rows.Scan(&good.OfferID, &good.Name, &good.Price, &good.Quantity, &good.Available, &good.SellerID)
-		if err != nil {
-			fmt.Printf("Error with scan row: %v", err)
+	for _, row := range rows {
+		g := Goods{
+			OfferID:   row.OfferID,
+			Name:      row.Name,
+			Price:     row.Price,
+			Quantity:  row.Quantity,
+			Available: row.Available,
+			SellerID:  row.SellerID,
 		}
-		goods = append(goods, good)
+		goods = append(goods, g)
 	}
 	return goods
 }
 
-func doQuery(offer_id int, seller_id int, substring string) *sql.Rows {
+func doQuery(offerId int, sellerId int, substring string) models.ProductSlice {
 	db, err := database.ConnectToDB()
 	if err != nil {
 		fmt.Printf("Error with connect to database: %v", err)
 	}
-	defer db.Close()
+	defer func(db *sql.DB) {
+		err := db.Close()
+		if err != nil {
 
-	getQuery := "SELECT * FROM products WHERE "
-	var rows *sql.Rows
-	var args []interface{}
-	if offer_id != 0 {
-		getQuery += "offer_id = $1"
-		args = append(args, offer_id)
-	}
-	if seller_id != 0 {
-		if len(args) == 0 {
-			getQuery += "seller_id = $1"
-		} else {
-			getQuery += "AND seller_id = $2"
 		}
-		args = append(args, seller_id)
-	}
+	}(db)
+	boil.SetDB(db)
 
+	var getQuery []QueryMod
+	if offerId != 0 {
+		getQuery = append(getQuery, Where("offer_id = ?", offerId))
+	}
+	if sellerId != 0 {
+		getQuery = append(getQuery, Where("seller_id = ?", sellerId))
+	}
 	if substring != "" {
-		if len(args) == 0 {
-			getQuery += "name LIKE $1"
-		} else {
-			getQuery += "AND name LIKE $" + strconv.Itoa(len(args)+1)
-		}
-		args = append(args, substring+"%")
+		getQuery = append(getQuery, Where("name LIKE ?", "%"+substring+"%"))
 	}
-	rows, _ = db.Query(getQuery, args...)
+	rows, _ := models.Products(getQuery...).All(context.Background(), db)
 	return rows
 }
