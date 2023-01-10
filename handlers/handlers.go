@@ -20,52 +20,69 @@ type getGoodsrequest struct {
 }
 
 func HandleXlsxProcessing(c *gin.Context) {
+	var retFile retrievalFile
+	if err := c.ShouldBindJSON(&retFile); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-	retFile := retrievalFile{}
-	err := c.ShouldBindJSON(&retFile)
+	if retFile.Url == "" || retFile.Seller_id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "URL and seller ID are required"})
+		return
+	}
 
-	url := retFile.Url
-	sellerID := retFile.Seller_id
+	resp, err := http.Get(retFile.Url)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	defer resp.Body.Close()
 
-	resp, err := http.Get(url)
 	file, err := io.ReadAll(resp.Body)
-
-	if file == nil {
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			return
-		}
-	}(resp.Body)
-
-	if sellerID == "" {
+	productList, err := goods.ParseXlsx(file, retFile.Seller_id)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	productList, err := goods.ParseXlsx(file, sellerID)
-
-	//save or update goods in the database
 	stats, err := goods.SaveGoods(productList)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"stats": stats})
 }
 
 func HandleGetGoods(c *gin.Context) {
-	getGoodsreq := getGoodsrequest{}
-	err := c.ShouldBindJSON(&getGoodsreq)
+	var getGoodsreq getGoodsrequest
+	if err := c.ShouldBindJSON(&getGoodsreq); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
+	offerID, err := strconv.ParseFloat(getGoodsreq.Offer_id, 64)
+	if err != nil && getGoodsreq.Offer_id != "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid offer ID"})
+		return
+	}
+
+	sellerID, err := strconv.ParseFloat(getGoodsreq.Seller_id, 64)
+	if err != nil && getGoodsreq.Seller_id != "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid seller ID"})
+		return
+	}
+
+	goodsList, err := goods.GetGoods(int(offerID), int(sellerID), getGoodsreq.GoodSubstring)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
-	offer_id, _ := strconv.Atoi(getGoodsreq.Offer_id)
-	seller_id, _ := strconv.Atoi(getGoodsreq.Seller_id)
 
-	goods_list := goods.GetGoods(offer_id, seller_id, getGoodsreq.GoodSubstring)
-
-	c.JSON(http.StatusOK, gin.H{"goods": goods_list})
+	c.JSON(http.StatusOK, gin.H{"goods": goodsList})
 }

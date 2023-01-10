@@ -2,7 +2,6 @@ package goods
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"github.com/thedatashed/xlsxreader"
 	"github.com/volatiletech/sqlboiler/v4/boil"
@@ -39,65 +38,67 @@ func ParseXlsx(file []byte, sellerID string) ([]Goods, error) {
 
 	var goods []Goods
 	for row := range xl.ReadRows(xl.Sheets[0]) {
-		id, err1 := strconv.ParseFloat(row.Cells[0].Value, 64)
-		price, err2 := strconv.ParseFloat(row.Cells[2].Value, 64)
-		quantity, err3 := strconv.ParseFloat(row.Cells[3].Value, 64)
-		available, err4 := strconv.ParseBool(row.Cells[4].Value)
-		sellerId, err5 := strconv.Atoi(sellerID)
-		//Пропустим товары с некорректными данными
-		if err1 != nil {
-			fmt.Printf("Error with convertation id to int: %v", err1)
+		var g Goods
+		var err error
+
+		OfferID, err := strconv.ParseFloat(row.Cells[0].Value, 64)
+		if err != nil {
+			fmt.Printf("Error with convertation id to int: %v", err)
 			continue
 		}
 
-		if err2 != nil {
-			fmt.Printf("Error with convertation price to float: %v", err2)
+		g.Name = row.Cells[1].Value
+		Price, err := strconv.ParseFloat(row.Cells[2].Value, 64)
+		if err != nil {
+			fmt.Printf("Error with convertation price to float: %v", err)
 			continue
 		}
 
-		if err3 != nil {
-			fmt.Printf("Error with convertation sellerid to int: %v", err3)
-			continue
-		}
-		if err4 != nil {
-			fmt.Printf("Error with convertation available to bool: %v", err4)
-			continue
-		}
-		if err5 != nil {
-			fmt.Printf("Error with convertation sellerid to int: %v", err5)
+		Quantity, err := strconv.ParseFloat(row.Cells[3].Value, 64)
+		if err != nil {
+			fmt.Printf("Error with convertation sellerid to int: %v", err)
 			continue
 		}
 
-		g := Goods{
-			OfferID:   int(id),
-			Name:      row.Cells[1].Value,
-			Price:     price,
-			Quantity:  int(quantity),
-			Available: available,
-			SellerID:  sellerId,
+		Available, err := strconv.ParseBool(row.Cells[4].Value)
+		if err != nil {
+			fmt.Printf("Error with convertation available to bool: %v", err)
+			continue
 		}
+
+		SellerID, err := strconv.Atoi(sellerID)
+		if err != nil {
+			fmt.Printf("Error with convertation sellerid to int: %v", err)
+			continue
+		}
+		g.OfferID = int(OfferID)
+		g.Name = row.Cells[1].Value
+		g.Price = Price
+		g.Quantity = int(Quantity)
+		g.Available = Available
+		g.SellerID = SellerID
+
 		goods = append(goods, g)
 	}
 	return goods, nil
 }
 
 func SaveGoods(goods []Goods) (Stats, error) {
-	// Connect to the database
 	db, err := database.ConnectToDB()
-	defer func(db *sql.DB) {
-		err := db.Close()
-		if err != nil {
-
-		}
-	}(db)
 	if err != nil {
 		return Stats{}, err
 	}
+	defer db.Close()
 
-	// Save or update the goods in the database
 	stats := Stats{}
 	for _, good := range goods {
-		match, _ := models.Products(Where("seller_id = ? AND offer_id = ?", good.SellerID, good.OfferID)).Exists(context.Background(), db)
+		match, err := models.Products(Where("seller_id = ? AND offer_id = ?",
+			good.SellerID, good.OfferID)).Exists(context.Background(), db)
+		if err != nil {
+			stats.Errors++
+			continue
+		}
+
 		product := models.Product{
 			OfferID:   good.OfferID,
 			Name:      good.Name,
@@ -115,9 +116,6 @@ func SaveGoods(goods []Goods) (Stats, error) {
 			}
 			stats.Created++
 		} else if good.Available == false && match {
-			product := models.Product{
-				OfferID:  good.OfferID,
-				SellerID: good.SellerID}
 			_, err := product.Delete(context.Background(), db)
 			if err != nil {
 				stats.Errors++
@@ -131,41 +129,37 @@ func SaveGoods(goods []Goods) (Stats, error) {
 				continue
 			}
 			stats.Updated++
-		} else {
-			continue
 		}
 	}
 	return stats, nil
 }
 
-func GetGoods(offerId int, sellerId int, substring string) []Goods {
-	rows := doQuery(offerId, sellerId, substring)
+func GetGoods(offerId int, sellerId int, substring string) ([]Goods, error) {
+	rows, err := doQuery(offerId, sellerId, substring)
+	if err != nil {
+		return nil, err
+	}
+
 	var goods []Goods
 	for _, row := range rows {
-		g := Goods{
+		goods = append(goods, Goods{
 			OfferID:   row.OfferID,
 			Name:      row.Name,
 			Price:     row.Price,
 			Quantity:  row.Quantity,
 			Available: row.Available,
 			SellerID:  row.SellerID,
-		}
-		goods = append(goods, g)
+		})
 	}
-	return goods
+	return goods, nil
 }
 
-func doQuery(offerId int, sellerId int, substring string) models.ProductSlice {
+func doQuery(offerId int, sellerId int, substring string) (models.ProductSlice, error) {
 	db, err := database.ConnectToDB()
 	if err != nil {
-		fmt.Printf("Error with connect to database: %v", err)
+		return nil, fmt.Errorf("Error with connect to database: %v", err)
 	}
-	defer func(db *sql.DB) {
-		err := db.Close()
-		if err != nil {
-
-		}
-	}(db)
+	defer db.Close()
 	boil.SetDB(db)
 
 	var getQuery []QueryMod
@@ -178,6 +172,9 @@ func doQuery(offerId int, sellerId int, substring string) models.ProductSlice {
 	if substring != "" {
 		getQuery = append(getQuery, Where("name LIKE ?", "%"+substring+"%"))
 	}
-	rows, _ := models.Products(getQuery...).All(context.Background(), db)
-	return rows
+	rows, err := models.Products(getQuery...).All(context.Background(), db)
+	if err != nil {
+		return nil, err
+	}
+	return rows, nil
 }

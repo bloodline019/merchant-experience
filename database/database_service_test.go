@@ -6,15 +6,17 @@ import (
 	"testing"
 )
 
-func dbConnection() *sql.DB {
+func dbConnection() (*sql.DB, error) {
 	// Connect to the database
 	db, err := ConnectToDB()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return db
+	return db, nil
 }
 
 func TestConnectToDB(t *testing.T) {
-	assert.True(t, dbConnection() != nil)
+	db, err := dbConnection()
+	assert.NoError(t, err)
+	assert.NotNil(t, db)
 }
