@@ -44,6 +44,11 @@ curl -X POST -H "Content-Type: application/json" -d '{
   "goodSubstring": "Pro"
 }' http://localhost:8080/getGoods
 ```
+# Запуск приложения через Docker:
+```
+docker compose up --build
+```
+
 # TODO:  
 1) Обработка потенциальных ошибок
 2) Заменить sql-запросы на ORM :heavy_check_mark:
