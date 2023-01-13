@@ -18,7 +18,6 @@ func ConnectToDB() (*sql.DB, error) {
 	}
 
 	if err = db.Ping(); err != nil {
-		err := fmt.Errorf("ОШИБКА: %v", err)
 		return nil, fmt.Errorf("Error pinging database: %v", err)
 	}
 
