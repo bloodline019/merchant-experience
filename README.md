@@ -48,5 +48,5 @@ curl -X POST -H "Content-Type: application/json" -d '{
 1) Обработка потенциальных ошибок
 2) Заменить sql-запросы на ORM :heavy_check_mark:
 3) Тесты
-4) Контейнеризация (Docker)
+4) Контейнеризация (Docker) :heavy_check_mark:
 5) Многопоточность
