@@ -44,13 +44,13 @@ func HandleXlsxProcessing(c *gin.Context) {
 		return
 	}
 
-	productList, err := goods.ParseXlsx(file, retFile.Seller_id)
+	productList, err, err_count := goods.ParseXlsx(file, retFile.Seller_id)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	stats, err := goods.SaveGoods(productList)
+	stats, err := goods.SaveGoods(productList, err_count)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

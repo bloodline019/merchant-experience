@@ -3,8 +3,8 @@ Content-Type: application/json
 
 {
   "offer_id": "",
-  "seller_id": "1",
-  "goodSubstring": "Pro"
+  "seller_id": "",
+  "goodSubstring": ""
 }
 
 ###
