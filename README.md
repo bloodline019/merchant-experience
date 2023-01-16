@@ -30,19 +30,12 @@ API реализует следующие методы:
 Для загрузки Excel файла на сервер и получения краткой статистики работы необходимо передать POST запрос по методу /upload на сервер c данными в формате JSON (Url, seller_id).  
 Формат запроса:
 ```
-curl -X POST -H "Content-Type: application/json" -d '{
-  "Url": "https://cdn.discordapp.com/attachments/1061032871785136158/1061033596057567394/goods_initial.xlsx",
-  "seller_id": "1"
-}' http://localhost:8080/upload
+curl -X POST -H "Content-Type: application/json" -d '{"Url": "https://cdn.discordapp.com/attachments/1061032871785136158/1061033596057567394/goods_initial.xlsx","seller_id": "1"}' http://localhost:8080/upload
 ```
 Для получения списка товаров из базы необходимо передать POST запрос по методу /getGoods на сервер c данными в формате JSON (поддерживается любая комбинация параметров).  
 Формат запроса:
 ```
-curl -X POST -H "Content-Type: application/json" -d '{
-  "offer_id": "",
-  "seller_id": "",
-  "goodSubstring": "Pro"
-}' http://localhost:8080/getGoods
+curl -X POST -H "Content-Type: application/json" -d '{"offer_id": "", "seller_id": "", "goodSubstring": "Pro" }' http://localhost:8080/getGoods
 ```
 # Запуск приложения через Docker:
 ```
