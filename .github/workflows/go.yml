@@ -26,4 +26,5 @@ jobs:
 
     - name: Build Docker Image
       run: |
-        docker-compose up
+        docker-compose up --build
+        docker-compose down
